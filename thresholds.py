@@ -3,11 +3,16 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from scipy import stats
-
 if TYPE_CHECKING:
     from models import ScoredPost
     from scorers import Scorer
+
+
+def _percentileofscore(scores: list[float], score: float) -> float:
+    """Returns the percentile rank of `score` within `scores` (0–100)."""
+    if not scores:
+        return 0.0
+    return sum(1 for s in scores if s <= score) / len(scores) * 100
 
 
 class Threshold(Enum):
@@ -21,26 +26,21 @@ class Threshold(Enum):
     def posts_meeting_criteria(
         self, posts: list[ScoredPost], scorer: Scorer
     ) -> list[ScoredPost]:
-        """Returns a list of ScoredPosts that meet this Threshold with the given Scorer"""
-
-        all_post_scores = [p.get_score(scorer) for p in posts]
-        threshold_posts = [
-            p
-            for p in posts
-            if stats.percentileofscore(all_post_scores, p.get_score(scorer))
-            >= self.value
+        """Returns ScoredPosts that meet this Threshold with the given Scorer."""
+        if not posts:
+            return []
+        scores = {p: p.get_score(scorer) for p in posts}
+        all_scores = list(scores.values())
+        return [
+            p for p in posts if _percentileofscore(all_scores, scores[p]) >= self.value
         ]
-
-        return threshold_posts
 
 
 def get_thresholds():
-    """Returns a dictionary mapping lowercase threshold names to values"""
-
+    """Returns a dictionary mapping lowercase threshold names to values."""
     return {i.get_name(): i.value for i in Threshold}
 
 
 def get_threshold_from_name(name: str) -> Threshold:
-    """Returns Threshold for a given named string"""
-
+    """Returns Threshold for a given named string."""
     return Threshold[name.upper()]

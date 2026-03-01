@@ -1,0 +1,15 @@
+[Unit]
+Description=Mastodon Email Digest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mastodon_email_digest
+ExecStart=/opt/mastodon_email_digest/venv/bin/python run.py -n 24 -s FriendWeighted -t lax
+EnvironmentFile=/opt/mastodon_email_digest/.env
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

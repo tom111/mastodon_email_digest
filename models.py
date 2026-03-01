@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 class ScoredPost:
     def __init__(self, info: dict):
         self.info = info
+        self.network_boost_count: int = 0
 
     @property
     def url(self) -> str:
@@ -19,7 +20,3 @@ class ScoredPost:
 
     def get_score(self, scorer: Scorer) -> float:
         return scorer.score(self)
-
-    @property
-    def data(self):
-        return self.info

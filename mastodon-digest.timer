@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily Mastodon Email Digest
+
+[Timer]
+OnCalendar=*-*-* 16:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

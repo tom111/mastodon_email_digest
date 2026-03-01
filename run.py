@@ -1,78 +1,182 @@
 from __future__ import annotations
 
 import argparse
+import inspect
+import logging
 import os
+import smtplib
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 from mastodon import Mastodon
 
-from api import fetch_posts_and_boosts
-from scorers import get_scorers
-from thresholds import get_threshold_from_name, get_thresholds
+from api import fetch_affinity_accounts, fetch_list_accounts, fetch_posts_and_boosts
 from formatters import format_posts
+from scorers import get_scorers
+from thresholds import Threshold, get_threshold_from_name, get_thresholds
 
 if TYPE_CHECKING:
     from scorers import Scorer
-    from thresholds import Threshold
+    from thresholds import Threshold as ThresholdType
 
 
-def render_digest(context: dict, output_dir: Path) -> None:
+def render_digest(context: dict, output_dir: Path) -> str:
+    """Renders the digest template and writes index.html. Returns the HTML string."""
     environment = Environment(loader=FileSystemLoader("templates/"))
     template = environment.get_template("digest.html.jinja")
     output_html = template.render(context)
-    output_file_path = output_dir / 'index.html'
+    output_file_path = output_dir / "index.html"
     output_file_path.write_text(output_html)
+    logging.info("Digest written to %s", output_file_path)
+    return output_html
+
+
+def send_email(html_body: str, subject: str) -> None:
+    """Sends the digest as an HTML email using SMTP credentials from the environment."""
+    mail_server = os.environ["MAIL_SERVER"]
+    mail_port = int(os.environ.get("MAIL_SERVER_PORT", "465"))
+    mail_username = os.environ["MAIL_USERNAME"]
+    mail_password = os.environ["MAIL_PASSWORD"]
+    mail_from = os.environ.get("MAIL_FROM", mail_username)
+    mail_destination = os.environ["MAIL_DESTINATION"]
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = mail_from
+    msg["To"] = mail_destination
+    msg.attach(MIMEText(html_body, "html"))
+
+    logging.info("Sending digest email to %s via %s:%s", mail_destination, mail_server, mail_port)
+    if mail_port == 465:
+        with smtplib.SMTP_SSL(mail_server, mail_port) as smtp:
+            smtp.login(mail_username, mail_password)
+            smtp.sendmail(mail_from, mail_destination, msg.as_string())
+    else:
+        with smtplib.SMTP(mail_server, mail_port) as smtp:
+            smtp.starttls()
+            smtp.login(mail_username, mail_password)
+            smtp.sendmail(mail_from, mail_destination, msg.as_string())
+    logging.info("Email sent successfully")
+
+
+def _make_scorer(scorer_class, affinity_accounts: set[str], list_accounts: set[str]):
+    """Instantiates a scorer, passing social context if the class accepts it."""
+    sig = inspect.signature(scorer_class.__init__)
+    params = sig.parameters
+    if "affinity_accounts" in params:
+        return scorer_class(
+            affinity_accounts=affinity_accounts,
+            list_accounts=list_accounts,
+        )
+    return scorer_class()
 
 
 def run(
     hours: int,
-    scorer: Scorer,
-    threshold: Threshold,
+    scorer_class,
+    threshold: ThresholdType,
     mastodon_token: str,
     mastodon_base_url: str,
     mastodon_username: str,
     output_dir: Path,
+    no_email: bool = False,
+    sleep_hours: int = 8,
 ) -> None:
 
-    print(f"Building digest from the past {hours} hours...")
+    logging.info("Building digest from the past %d hours...", hours)
 
     mst = Mastodon(
         access_token=mastodon_token,
         api_base_url=mastodon_base_url,
     )
 
-    # 1. Fetch all the posts and boosts from our home timeline that we haven't interacted with
-    posts, boosts = fetch_posts_and_boosts(hours, mst, mastodon_username)
+    # Fetch social context for scorers that use it
+    affinity_accounts: set[str] = set()
+    list_accounts: set[str] = set()
+    sig = inspect.signature(scorer_class.__init__)
+    if "affinity_accounts" in sig.parameters:
+        logging.info("Fetching social context (favourites + lists)...")
+        affinity_accounts = fetch_affinity_accounts(mst)
+        list_accounts = fetch_list_accounts(mst)
+        logging.info(
+            "Social context: %d affinity accounts, %d list accounts",
+            len(affinity_accounts),
+            len(list_accounts),
+        )
 
-    # 2. Score them, and return those that meet our threshold
+    scorer = _make_scorer(scorer_class, affinity_accounts, list_accounts)
+
+    # Fetch all posts and boosts from the home timeline
+    posts, boosts = fetch_posts_and_boosts(hours, mst, mastodon_username)
+    logging.info("Fetched %d posts and %d boosts", len(posts), len(boosts))
+
+    # Split posts into recent vs overnight
+    now = datetime.now(timezone.utc)
+    sleep_cutoff = now - timedelta(hours=sleep_hours)
+    recent_posts = [p for p in posts if p.info["created_at"] > sleep_cutoff]
+    overnight_posts_all = [p for p in posts if p.info["created_at"] <= sleep_cutoff]
+
+    # Score and filter
     threshold_posts = format_posts(
-        threshold.posts_meeting_criteria(posts, scorer),
-        mastodon_base_url)
+        threshold.posts_meeting_criteria(recent_posts, scorer),
+        mastodon_base_url,
+    )
     threshold_boosts = format_posts(
         threshold.posts_meeting_criteria(boosts, scorer),
-        mastodon_base_url)
+        mastodon_base_url,
+    )
+    # Overnight section uses a relaxed threshold regardless of CLI choice
+    overnight_threshold_posts = format_posts(
+        Threshold.LAX.posts_meeting_criteria(overnight_posts_all, scorer),
+        mastodon_base_url,
+    )
 
-    # 3. Build the digest
-    render_digest(
+    logging.info(
+        "After filtering: %d posts, %d boosts, %d overnight posts",
+        len(threshold_posts),
+        len(threshold_boosts),
+        len(overnight_threshold_posts),
+    )
+
+    # Render
+    html = render_digest(
         context={
             "hours": hours,
             "posts": threshold_posts,
             "boosts": threshold_boosts,
+            "overnight_posts": overnight_threshold_posts,
+            "sleep_hours": sleep_hours,
             "mastodon_base_url": mastodon_base_url,
-            "rendered_at": datetime.utcnow().isoformat() + 'Z',
-            # "rendered_at": datetime.utcnow().strftime('%B %d, %Y at %H:%M:%S UTC'),
+            "rendered_at": datetime.now(timezone.utc).isoformat(),
             "threshold": threshold.get_name(),
             "scorer": scorer.get_name(),
         },
         output_dir=output_dir,
     )
 
+    if no_email:
+        logging.info("--no-email set; skipping email send")
+        return
+
+    required_mail_vars = ["MAIL_SERVER", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_DESTINATION"]
+    missing = [v for v in required_mail_vars if not os.environ.get(v)]
+    if missing:
+        logging.warning("Missing mail env vars: %s — skipping email", ", ".join(missing))
+        return
+
+    subject = f"Mastodon Digest — {datetime.now(timezone.utc).strftime('%b %-d, %Y')}"
+    send_email(html, subject)
+
 
 if __name__ == "__main__":
+    load_dotenv()
+
     scorers = get_scorers()
     thresholds = get_thresholds()
 
@@ -91,34 +195,61 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "-s",
         choices=list(scorers.keys()),
-        default="SimpleWeighted",
+        default="FriendWeighted",
         dest="scorer",
-        help="""Which post scoring criteria to use.  
-            Simple scorers take a geometric mean of boosts and favs. 
-            Extended scorers include reply counts in the geometric mean. 
-            Weighted scorers multiply the score by an inverse sqaure root 
-            of the author's followers, to reduce the influence of large accounts.
-        """,
+        help=(
+            "Which post scoring criteria to use. "
+            "Simple scorers use geometric mean of boosts and favs. "
+            "Extended scorers add reply counts. "
+            "Weighted scorers penalise large accounts. "
+            "FriendBoost uses network boost count. "
+            "FriendWeighted adds affinity and list membership boosts."
+        ),
     )
     arg_parser.add_argument(
         "-t",
         choices=list(thresholds.keys()),
         default="normal",
         dest="threshold",
-        help="""Which post threshold criteria to use.
-            lax = 90th percentile,
-            normal = 95th percentile,
-            strict = 98th percentile
-        """,
+        help="lax=90th pct, normal=95th pct, strict=98th pct",
     )
     arg_parser.add_argument(
         "-o",
         default="./render/",
         dest="output_dir",
         help="Output directory for the rendered digest",
-        required=False,
+    )
+    arg_parser.add_argument(
+        "--no-email",
+        action="store_true",
+        default=False,
+        dest="no_email",
+        help="Skip sending email; just write render/index.html",
+    )
+    arg_parser.add_argument(
+        "--sleep-hours",
+        default=8,
+        dest="sleep_hours",
+        help="Posts older than this many hours appear in the Overnight section",
+        type=int,
+    )
+    arg_parser.add_argument(
+        "--log-file",
+        default=None,
+        dest="log_file",
+        help="Path to log file (in addition to stdout)",
     )
     args = arg_parser.parse_args()
+
+    # Configure logging
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if args.log_file:
+        handlers.append(logging.FileHandler(args.log_file))
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=handlers,
+    )
 
     output_dir = Path(args.output_dir)
     if not output_dir.exists() or not output_dir.is_dir():
@@ -136,11 +267,13 @@ if __name__ == "__main__":
         sys.exit("Missing environment variable: MASTODON_USERNAME")
 
     run(
-        args.hours,
-        scorers[args.scorer](),
-        get_threshold_from_name(args.threshold),
-        mastodon_token,
-        mastodon_base_url,
-        mastodon_username,
-        output_dir,
+        hours=args.hours,
+        scorer_class=scorers[args.scorer],
+        threshold=get_threshold_from_name(args.threshold),
+        mastodon_token=mastodon_token,
+        mastodon_base_url=mastodon_base_url,
+        mastodon_username=mastodon_username,
+        output_dir=output_dir,
+        no_email=args.no_email,
+        sleep_hours=args.sleep_hours,
     )

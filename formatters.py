@@ -1,37 +1,45 @@
+from html import escape
+
+
 def format_post(post, mastodon_base_url) -> dict:
-    
+
     def format_media(media):
-        formats = {
-            'image': f'<div class="media"><img src={media["url"]} alt={media["description"] if media["description"] != None else ""}></img></div>',
-            'video': f'<a href="src={media["url"]} class="placeholder" title="see the video on mastodon">🎞️</a>',
-            'gifv': f'<a href="src={media["url"]} class="placeholder" title="see the gif on mastodon">🎞️</a>'
-        }
-        if formats.__contains__(media.type):
-            return formats[media.type]
-        else:
-            return ""
+        media_type = media["type"]
+        url = escape(media["url"], quote=True)
+        if media_type == "image":
+            alt = escape(media["description"] or "", quote=True)
+            return f'<div class="media"><img src="{url}" alt="{alt}"></div>'
+        elif media_type in ("video", "gifv"):
+            return f'<a href="{url}" class="placeholder" title="see the video on mastodon">🎞️</a>'
+        return ""
 
     def format_displayname(display_name, emojis):
+        display_name = escape(display_name)
         for emoji in emojis:
-            display_name = display_name.replace(f':{emoji["shortcode"]}:', f'<img alt={emoji["shortcode"]} src="{emoji["url"]}">')
+            shortcode = escape(emoji["shortcode"], quote=True)
+            url = escape(emoji["url"], quote=True)
+            display_name = display_name.replace(
+                f":{emoji['shortcode']}:",
+                f'<img alt="{shortcode}" src="{url}">',
+            )
         return display_name
 
-    account_avatar = post.data['account']['avatar']
-    account_url = post.data['account']['url']
+    account_avatar = post.info["account"]["avatar"]
+    account_url = post.info["account"]["url"]
     display_name = format_displayname(
-        post.data['account']['display_name'],
-        post.data['account']['emojis']
+        post.info["account"]["display_name"],
+        post.info["account"]["emojis"],
     )
-    username = post.data['account']['username']
-    content = post.data['content']
-    media = "\n".join([format_media(media) for media in post.data.media_attachments])
-    created_at = post.data['created_at'].strftime('%b %-d, %Y at %H:%M')
-    home_link = f'<a href="{post.get_home_url(mastodon_base_url)}" target="_blank">home</a>'
-    original_link = f'<a href="{post.data.url}" target="_blank">original</a>'
-    replies_count = post.data['replies_count']
-    reblogs_count = post.data['reblogs_count']
-    favourites_count = post.data['favourites_count']
-    
+    username = post.info["account"]["username"]
+    content = post.info["content"]
+    media = "\n".join([format_media(m) for m in post.info["media_attachments"]])
+    created_at = post.info["created_at"].strftime("%b %-d, %Y at %H:%M")
+    home_url = post.get_home_url(mastodon_base_url)
+    original_url = post.info["url"]
+    replies_count = post.info["replies_count"]
+    reblogs_count = post.info["reblogs_count"]
+    favourites_count = post.info["favourites_count"]
+
     return dict(
         account_avatar=account_avatar,
         account_url=account_url,
@@ -40,12 +48,13 @@ def format_post(post, mastodon_base_url) -> dict:
         content=content,
         media=media,
         created_at=created_at,
-        home_link=home_link,
-        original_link=original_link,
+        home_url=home_url,
+        original_url=original_url,
         replies_count=replies_count,
         reblogs_count=reblogs_count,
-        favourites_count=favourites_count
+        favourites_count=favourites_count,
     )
-    
+
+
 def format_posts(posts, mastodon_base_url):
     return [format_post(post, mastodon_base_url) for post in posts]

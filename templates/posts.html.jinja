@@ -2,8 +2,8 @@
 
 <div class="post">
 
-  <div class="status">  
-  
+  <div class="status">
+
     <div class="post_header">
 
         <div class="user">
@@ -13,25 +13,25 @@
               <img src="{{ post['account_avatar'] }}">
             </a>
           </div>
-        
+
           <a target="_blank" href="{{ post['account_url'] }}">
-            <div class="displayname">{{ post['display_name'] }}</div>
+            <div class="displayname">{{ post['display_name'] | safe }}</div>
             <div class="username">@{{ post['username'] }}</div>
           </a>
 
         </div>
 
     </div>
-      
+
     <div class="post_content">
 
       <div class="content">
-	      {{ post['content'] }}
+	      {{ post['content'] | safe }}
       </div>
 
      {% if post['media'] %}
         <div class="medias">
-	        {{ post['media'] }}
+	        {{ post['media'] | safe }}
         </div>
      {% endif %}
 
@@ -42,18 +42,18 @@
       <div class="published date">{{post['created_at']}}</div>
 
       <div class="links">
-        {{ post['home_link'] }}
-        {{ post['original_link'] }}
+        <a class="home-link" href="{{ post['home_url'] }}" target="_blank">home</a>
+        <a class="original-link" href="{{ post['original_url'] }}" target="_blank">original</a>
       </div>
-      
+
       <div class="reactions">
         <span>⥄ {{post['replies_count']}}</span>
         <span> ↻ {{post['reblogs_count']}}</span>
         <span>★ {{post['favourites_count']}}</span>
       </div>
-      
+
     </div>
-    
+
   </div>
 
 </div>
