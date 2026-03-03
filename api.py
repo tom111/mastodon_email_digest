@@ -71,8 +71,8 @@ def fetch_posts_and_boosts(
                         posts.append(scored_post)
                     seen_posts[post_url] = scored_post
 
-        # fetch_next() follows the `next` Link header → older posts within our window
-        response = mastodon_client.fetch_next(response)
+        # fetch_previous() follows the `prev` Link header → newer posts within our window
+        response = mastodon_client.fetch_previous(response)
 
     return posts, boosts
 
