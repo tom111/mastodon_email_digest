@@ -54,6 +54,7 @@ def format_post(post, mastodon_base_url) -> dict:
         replies_count=replies_count,
         reblogs_count=reblogs_count,
         favourites_count=favourites_count,
+        network_boost_count=post.network_boost_count,
     )
 
 

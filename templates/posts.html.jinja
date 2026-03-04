@@ -46,6 +46,12 @@
         <a class="original-link" href="{{ post['original_url'] }}" target="_blank">original</a>
       </div>
 
+      {% if post['network_boost_count'] %}
+      <div class="network-boosts">
+        <span>👥 {{post['network_boost_count']}} of your follows boosted</span>
+      </div>
+      {% endif %}
+
       <div class="reactions">
         <span>⥄ {{post['replies_count']}}</span>
         <span> ↻ {{post['reblogs_count']}}</span>
