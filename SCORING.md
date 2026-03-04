@@ -115,6 +115,8 @@ Posts with **no language tag** (the `language` field is null or empty) are treat
 
 The penalty is applied as a multiplier on the post's score **before percentile filtering**, so non-preferred language posts compete at a disadvantage rather than being excluded outright.
 
+Language codes are [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) two-letter codes — the same ones Mastodon uses. Common examples: `en` (English), `de` (German), `nl` (Dutch), `fr` (French), `es` (Spanish), `ja` (Japanese), `pt` (Portuguese).
+
 ### Minimum Score (`--min-score`)
 
 Sets an absolute score floor applied **after percentile filtering**. During quiet periods, the percentile threshold alone may let zero-engagement posts through. A minimum score (e.g. `--min-score 1.5`) ensures only posts with meaningful engagement appear.

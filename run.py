@@ -231,7 +231,7 @@ if __name__ == "__main__":
         "--languages",
         default=None,
         dest="languages",
-        help="Comma-separated preferred languages (e.g. en,de). Posts in other languages are penalized, not excluded. Posts with no language tag are treated as preferred.",
+        help="Comma-separated ISO 639-1 language codes (e.g. en,de,nl). Posts in other languages are penalized, not excluded. Posts with no language tag are treated as preferred.",
     )
     arg_parser.add_argument(
         "--language-penalty",
