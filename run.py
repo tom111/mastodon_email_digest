@@ -6,7 +6,7 @@ import logging
 import os
 import smtplib
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -19,7 +19,7 @@ from mastodon import Mastodon
 from api import fetch_affinity_accounts, fetch_list_accounts, fetch_posts_and_boosts
 from formatters import format_posts
 from scorers import get_scorers
-from thresholds import Threshold, get_threshold_from_name, get_thresholds
+from thresholds import get_threshold_from_name, get_thresholds
 
 if TYPE_CHECKING:
     from scorers import Scorer
@@ -88,7 +88,6 @@ def run(
     no_email: bool = False,
     exclude_lists: bool = False,
     min_score: float = 0,
-    sleep_hours: int = 8,
 ) -> None:
 
     logging.info("Building digest from the past %d hours...", hours)
@@ -126,33 +125,22 @@ def run(
         boosts = [p for p in boosts if str(p.info["account"]["id"]) not in list_accounts]
         logging.info("After excluding list accounts: %d posts and %d boosts", len(posts), len(boosts))
 
-    # Split posts into recent vs overnight
-    now = datetime.now(timezone.utc)
-    sleep_cutoff = now - timedelta(hours=sleep_hours)
-    recent_posts = [p for p in posts if p.info["created_at"] > sleep_cutoff]
-    overnight_posts_all = [p for p in posts if p.info["created_at"] <= sleep_cutoff]
-
     # Score and filter by percentile
-    filtered_posts = threshold.posts_meeting_criteria(recent_posts, scorer)
+    filtered_posts = threshold.posts_meeting_criteria(posts, scorer)
     filtered_boosts = threshold.posts_meeting_criteria(boosts, scorer)
-    # Overnight section uses a relaxed threshold regardless of CLI choice
-    filtered_overnight = Threshold.LAX.posts_meeting_criteria(overnight_posts_all, scorer)
 
     # Apply minimum score floor
     if min_score > 0:
         filtered_posts = [p for p in filtered_posts if p.get_score(scorer) >= min_score]
         filtered_boosts = [p for p in filtered_boosts if p.get_score(scorer) >= min_score]
-        filtered_overnight = [p for p in filtered_overnight if p.get_score(scorer) >= min_score]
 
     threshold_posts = format_posts(filtered_posts, mastodon_base_url)
     threshold_boosts = format_posts(filtered_boosts, mastodon_base_url)
-    overnight_threshold_posts = format_posts(filtered_overnight, mastodon_base_url)
 
     logging.info(
-        "After filtering: %d posts, %d boosts, %d overnight posts",
+        "After filtering: %d posts, %d boosts",
         len(threshold_posts),
         len(threshold_boosts),
-        len(overnight_threshold_posts),
     )
 
     # Render
@@ -161,8 +149,6 @@ def run(
             "hours": hours,
             "posts": threshold_posts,
             "boosts": threshold_boosts,
-            "overnight_posts": overnight_threshold_posts,
-            "sleep_hours": sleep_hours,
             "mastodon_base_url": mastodon_base_url,
             "rendered_at": datetime.now(timezone.utc).isoformat(),
             "threshold": threshold.get_name(),
@@ -253,13 +239,6 @@ if __name__ == "__main__":
         help="Skip sending email; just write render/index.html",
     )
     arg_parser.add_argument(
-        "--sleep-hours",
-        default=8,
-        dest="sleep_hours",
-        help="Posts older than this many hours appear in the Overnight section",
-        type=int,
-    )
-    arg_parser.add_argument(
         "--log-file",
         default=None,
         dest="log_file",
@@ -305,5 +284,4 @@ if __name__ == "__main__":
         no_email=args.no_email,
         exclude_lists=args.exclude_lists,
         min_score=args.min_score,
-        sleep_hours=args.sleep_hours,
     )

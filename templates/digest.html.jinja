@@ -48,10 +48,6 @@
         color:#555759;
       }
 
-      .stream_title.overnight {
-        color: #7a6e8a;
-        font-size: 1.6em;
-      }
 
       .post {
         background-color: #fff;
@@ -64,10 +60,6 @@
         margin: 0px 5px 15px 5px;
       }
 
-      .post.overnight {
-        border-color: #d3cce3;
-        background-color: #faf9fc;
-      }
 
       .status {
         width: 100%;
@@ -227,16 +219,6 @@
           </div>
         </div>
 
-        {% if overnight_posts %}
-        <div class="stream">
-          <div class="stream_title overnight"><span>🌙 Overnight</span></div>
-          <div class="posts">
-            {% with posts=overnight_posts %}
-            {% include "posts.html.jinja" %}
-            {% endwith %}
-          </div>
-        </div>
-        {% endif %}
 
       </div>
 
