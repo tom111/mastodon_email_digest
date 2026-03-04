@@ -21,7 +21,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: run digest
-        if: 
         env:
           MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
           MASTODON_BASE_URL: ${{ secrets.MASTODON_BASE_URL }}

@@ -256,8 +256,10 @@ if __name__ == "__main__":
         sys.exit(f"Output directory not found: {args.output_dir}")
 
     mastodon_token = os.getenv("MASTODON_TOKEN")
-    mastodon_base_url = os.getenv("MASTODON_BASE_URL")
-    mastodon_username = os.getenv("MASTODON_USERNAME")
+    mastodon_base_url = os.getenv("MASTODON_BASE_URL", "").rstrip("/")
+    if mastodon_base_url and not mastodon_base_url.startswith(("http://", "https://")):
+        mastodon_base_url = "https://" + mastodon_base_url
+    mastodon_username = os.getenv("MASTODON_USERNAME", "").lstrip("@")
 
     if not mastodon_token:
         sys.exit("Missing environment variable: MASTODON_TOKEN")
