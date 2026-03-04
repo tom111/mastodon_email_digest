@@ -24,9 +24,8 @@
 - [x] Language filtering (`--languages`, `--language-penalty`) — posts in non-preferred
       languages are penalized rather than excluded.
 
-- [ ] CI workflow (`update.yml:30`) uses `SimpleWeighted` scorer, but the CLI
-      default and Makefile use `FriendWeighted` (the better scorer). Should be
-      consistent.
+- [x] CI workflow (`update.yml:29`) uses `SimpleWeighted` scorer, but the CLI
+      default and Makefile use `FriendWeighted` (the better scorer). Now consistent.
 
 - [ ] The affinity window for `FriendWeightedScorer` is hardcoded to 7 days
       (`api.py:82`). Could be a CLI option.
