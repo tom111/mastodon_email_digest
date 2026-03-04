@@ -30,6 +30,8 @@
 - [x] The affinity window for `FriendWeightedScorer` is hardcoded to 7 days
       (`api.py:82`). Now configurable via `--affinity-days`.
 
+- [ ] Update the README file.  This is now a new fork with new perspective.
+
 ## To think through
 
 - [ ] How to handle time zones and activity windows. The old overnight section
@@ -38,3 +40,5 @@
       letting the user specify their active hours / timezone, or simply relying
       on the lookback window (`-n`) and scoring to surface what matters regardless
       of when it was posted.
+
+- [ ] Stop running this on Microsoft github, check different deployment methods.
