@@ -33,7 +33,8 @@ def format_post(post, mastodon_base_url) -> dict:
     username = post.info["account"]["username"]
     content = post.info["content"]
     media = "\n".join([format_media(m) for m in post.info["media_attachments"]])
-    created_at = post.info["created_at"].strftime("%b %-d, %Y at %H:%M")
+    dt = post.info["created_at"]
+    created_at = f"{dt.strftime('%b')} {dt.day}, {dt.year} at {dt.strftime('%H:%M')}"
     home_url = post.get_home_url(mastodon_base_url)
     original_url = post.info["url"]
     replies_count = post.info["replies_count"]

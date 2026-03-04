@@ -170,7 +170,8 @@ def run(
         logging.warning("Missing mail env vars: %s — skipping email", ", ".join(missing))
         return
 
-    subject = f"Mastodon Digest — {datetime.now(timezone.utc).strftime('%b %-d, %Y')}"
+    now = datetime.now(timezone.utc)
+    subject = f"Mastodon Digest — {now.strftime('%b')} {now.day}, {now.year}"
     send_email(html, subject)
 
 
