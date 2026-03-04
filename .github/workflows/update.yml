@@ -25,16 +25,10 @@ jobs:
           MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
           MASTODON_BASE_URL: ${{ secrets.MASTODON_BASE_URL }}
           MASTODON_USERNAME: ${{ secrets.MASTODON_USERNAME }}
+          MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
+          MAIL_SERVER_PORT: ${{ secrets.MAIL_SERVER_PORT }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_DESTINATION: ${{ secrets.MAIL_DESTINATION }}
         run: |
           python run.py -n 24 -s FriendWeighted -t lax
-      - name: email
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{secrets.MAIL_SERVER}}
-          server_port: ${{secrets.MAIL_SERVER_PORT}}
-          username: ${{secrets.MAIL_USERNAME}}
-          password: ${{secrets.MAIL_PASSWORD}}
-          subject: Mastodon Email Digest
-          to: ${{secrets.MAIL_DESTINATION}}
-          from: Mastodon Digest Bot
-          html_body: file://render/index.html
