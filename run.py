@@ -86,6 +86,7 @@ def run(
     mastodon_username: str,
     output_dir: Path,
     no_email: bool = False,
+    exclude_lists: bool = False,
     min_score: float = 0,
     sleep_hours: int = 8,
 ) -> None:
@@ -97,13 +98,15 @@ def run(
         api_base_url=mastodon_base_url,
     )
 
-    # Fetch social context for scorers that use it
+    # Fetch social context for scorers that use it, or for --exclude-lists
     affinity_accounts: set[str] = set()
     list_accounts: set[str] = set()
     sig = inspect.signature(scorer_class.__init__)
-    if "affinity_accounts" in sig.parameters:
+    needs_social_context = "affinity_accounts" in sig.parameters
+    if needs_social_context or exclude_lists:
         logging.info("Fetching social context (favourites + lists)...")
-        affinity_accounts = fetch_affinity_accounts(mst)
+        if needs_social_context:
+            affinity_accounts = fetch_affinity_accounts(mst)
         list_accounts = fetch_list_accounts(mst)
         logging.info(
             "Social context: %d affinity accounts, %d list accounts",
@@ -116,6 +119,12 @@ def run(
     # Fetch all posts and boosts from the home timeline
     posts, boosts = fetch_posts_and_boosts(hours, mst, mastodon_username)
     logging.info("Fetched %d posts and %d boosts", len(posts), len(boosts))
+
+    # Exclude posts from list members (user already reads these in a list client)
+    if exclude_lists and list_accounts:
+        posts = [p for p in posts if str(p.info["account"]["id"]) not in list_accounts]
+        boosts = [p for p in boosts if str(p.info["account"]["id"]) not in list_accounts]
+        logging.info("After excluding list accounts: %d posts and %d boosts", len(posts), len(boosts))
 
     # Split posts into recent vs overnight
     now = datetime.now(timezone.utc)
@@ -223,6 +232,13 @@ if __name__ == "__main__":
         help="Output directory for the rendered digest",
     )
     arg_parser.add_argument(
+        "--exclude-lists",
+        action="store_true",
+        default=False,
+        dest="exclude_lists",
+        help="Exclude posts from accounts on your Mastodon lists (useful if you already read lists in a separate client)",
+    )
+    arg_parser.add_argument(
         "--min-score",
         default=0,
         dest="min_score",
@@ -287,6 +303,7 @@ if __name__ == "__main__":
         mastodon_username=mastodon_username,
         output_dir=output_dir,
         no_email=args.no_email,
+        exclude_lists=args.exclude_lists,
         min_score=args.min_score,
         sleep_hours=args.sleep_hours,
     )

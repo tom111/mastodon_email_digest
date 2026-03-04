@@ -99,6 +99,18 @@ if in_a_list:           score *= 1.3
 
 **Good for:** The most personalised ranking. Combines network trust, recent interaction history, and list curation. This is the default scorer.
 
+## Pre-filters
+
+### Exclude Lists (`--exclude-lists`)
+
+If you already follow your Mastodon lists in a dedicated client (e.g. Ivory), those posts don't need to appear in the digest. When `--exclude-lists` is enabled, all posts from accounts that belong to any of your lists are dropped **before scoring**. This focuses the digest on posts you're likely to miss rather than ones you've already seen.
+
+This works with any scorer, not just FriendWeighted. When combined with FriendWeighted, the list accounts are still fetched (for both exclusion and the affinity multiplier on non-list accounts), so there's no extra API cost.
+
+### Minimum Score (`--min-score`)
+
+Sets an absolute score floor applied **after percentile filtering**. During quiet periods, the percentile threshold alone may let zero-engagement posts through. A minimum score (e.g. `--min-score 1.5`) ensures only posts with meaningful engagement appear.
+
 ## Thresholds
 
 After scoring, posts are filtered by percentile rank. Only posts at or above the threshold percentile are included in the digest.
@@ -117,3 +129,5 @@ After scoring, posts are filtered by percentile rank. Only posts at or above the
 | `-t` | Percentile threshold | `lax` (90), `normal` (95), `strict` (98) |
 | `-n` | Hours to look back | 1–24 (default 12) |
 | `-o` | Output directory | path (default `./render/`) |
+| `--min-score` | Minimum absolute score | float (default 0 = disabled) |
+| `--exclude-lists` | Drop posts from list members | flag (default off) |
