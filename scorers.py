@@ -34,7 +34,7 @@ class InverseFollowerWeight(Weight):
     def weight(cls, scored_post: ScoredPost) -> float:
         followers = scored_post.info["account"]["followers_count"]
         if followers == 0:
-            return 0.0
+            return 1.0
         return 1.0 / sqrt(followers)
 
 
