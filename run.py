@@ -87,6 +87,8 @@ def run(
     output_dir: Path,
     no_email: bool = False,
     exclude_lists: bool = False,
+    languages: list[str] | None = None,
+    language_penalty: float = 0.5,
     min_score: float = 0,
 ) -> None:
 
@@ -124,6 +126,14 @@ def run(
         posts = [p for p in posts if str(p.info["account"]["id"]) not in list_accounts]
         boosts = [p for p in boosts if str(p.info["account"]["id"]) not in list_accounts]
         logging.info("After excluding list accounts: %d posts and %d boosts", len(posts), len(boosts))
+
+    # Apply language penalty to non-preferred languages (before scoring)
+    if languages:
+        lang_set = {lang.lower() for lang in languages}
+        for p in posts + boosts:
+            post_lang = (p.info.get("language") or "").lower()
+            if post_lang and post_lang not in lang_set:
+                p.score_multiplier *= language_penalty
 
     # Score and filter by percentile
     filtered_posts = threshold.posts_meeting_criteria(posts, scorer)
@@ -218,6 +228,19 @@ if __name__ == "__main__":
         help="Output directory for the rendered digest",
     )
     arg_parser.add_argument(
+        "--languages",
+        default=None,
+        dest="languages",
+        help="Comma-separated preferred languages (e.g. en,de). Posts in other languages are penalized, not excluded. Posts with no language tag are treated as preferred.",
+    )
+    arg_parser.add_argument(
+        "--language-penalty",
+        default=0.5,
+        dest="language_penalty",
+        help="Score multiplier for posts in non-preferred languages (0.0–1.0, default 0.5)",
+        type=float,
+    )
+    arg_parser.add_argument(
         "--exclude-lists",
         action="store_true",
         default=False,
@@ -283,5 +306,7 @@ if __name__ == "__main__":
         output_dir=output_dir,
         no_email=args.no_email,
         exclude_lists=args.exclude_lists,
+        languages=args.languages.split(",") if args.languages else None,
+        language_penalty=args.language_penalty,
         min_score=args.min_score,
     )

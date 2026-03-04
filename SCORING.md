@@ -107,6 +107,14 @@ If you already follow your Mastodon lists in a dedicated client (e.g. Ivory), th
 
 This works with any scorer, not just FriendWeighted. When combined with FriendWeighted, the list accounts are still fetched (for both exclusion and the affinity multiplier on non-list accounts), so there's no extra API cost.
 
+### Language Penalty (`--languages`, `--language-penalty`)
+
+If you follow people who post in multiple languages, you can specify your preferred languages with `--languages en,de`. Posts in other languages receive a score penalty (default 0.5×, configurable via `--language-penalty`). This means a Dutch or French post needs roughly twice the engagement to appear alongside English/German posts — but a genuinely great post in any language will still make the cut.
+
+Posts with **no language tag** (the `language` field is null or empty) are treated as preferred — no penalty is applied. This is the safe default since many clients don't set the language field.
+
+The penalty is applied as a multiplier on the post's score **before percentile filtering**, so non-preferred language posts compete at a disadvantage rather than being excluded outright.
+
 ### Minimum Score (`--min-score`)
 
 Sets an absolute score floor applied **after percentile filtering**. During quiet periods, the percentile threshold alone may let zero-engagement posts through. A minimum score (e.g. `--min-score 1.5`) ensures only posts with meaningful engagement appear.
@@ -129,5 +137,7 @@ After scoring, posts are filtered by percentile rank. Only posts at or above the
 | `-t` | Percentile threshold | `lax` (90), `normal` (95), `strict` (98) |
 | `-n` | Hours to look back | 1–24 (default 12) |
 | `-o` | Output directory | path (default `./render/`) |
+| `--languages` | Preferred languages | comma-separated codes, e.g. `en,de` (default: none = no penalty) |
+| `--language-penalty` | Score multiplier for non-preferred languages | 0.0–1.0 (default 0.5) |
 | `--min-score` | Minimum absolute score | float (default 0 = disabled) |
 | `--exclude-lists` | Drop posts from list members | flag (default off) |

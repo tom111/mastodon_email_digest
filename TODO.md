@@ -21,8 +21,8 @@
 - [x] Add `--exclude-lists` flag to drop posts from accounts on your lists
       (for users who already read lists in a dedicated client like Ivory).
 
-- [ ] Language filtering (`--language`) — for users who follow people writing in
-      multiple languages.
+- [x] Language filtering (`--languages`, `--language-penalty`) — posts in non-preferred
+      languages are penalized rather than excluded.
 
 - [ ] CI workflow (`update.yml:30`) uses `SimpleWeighted` scorer, but the CLI
       default and Makefile use `FriendWeighted` (the better scorer). Should be

@@ -10,6 +10,7 @@ class ScoredPost:
     def __init__(self, info: dict):
         self.info = info
         self.network_boost_count: int = 0
+        self.score_multiplier: float = 1.0
 
     @property
     def url(self) -> str:
@@ -19,4 +20,4 @@ class ScoredPost:
         return f"{mastodon_base_url}/@{self.info['account']['acct']}/{self.info['id']}"
 
     def get_score(self, scorer: Scorer) -> float:
-        return scorer.score(self)
+        return scorer.score(self) * self.score_multiplier
