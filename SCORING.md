@@ -85,7 +85,7 @@ if replies > (favourites + reblogs):
 
 Extends FriendBoost with a **social-affinity multiplier**. Two bonus signals are layered on top:
 
-- **Affinity bonus (1.5×):** If you have favourited posts from an account in the last 7 days, their posts get a 1.5× boost. This rewards accounts you actively engage with.
+- **Affinity bonus (1.5×):** If you have favourited posts from an account recently (default: last 7 days, configurable via `--affinity-days`), their posts get a 1.5× boost. This rewards accounts you actively engage with.
 
 - **List bonus (1.3×):** If the author is in any of your Mastodon lists, their posts get a 1.3× boost. Lists are typically curated for quality, so this is a trust signal.
 
@@ -142,4 +142,5 @@ After scoring, posts are filtered by percentile rank. Only posts at or above the
 | `--languages` | Preferred languages | comma-separated codes, e.g. `en,de` (default: none = no penalty) |
 | `--language-penalty` | Score multiplier for non-preferred languages | 0.0–1.0 (default 0.5) |
 | `--min-score` | Minimum absolute score | float (default 0 = disabled) |
+| `--affinity-days` | Days of favourites for affinity bonus | int (default 7) |
 | `--exclude-lists` | Drop posts from list members | flag (default off) |

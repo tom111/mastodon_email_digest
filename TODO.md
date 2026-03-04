@@ -27,8 +27,8 @@
 - [x] CI workflow (`update.yml:29`) uses `SimpleWeighted` scorer, but the CLI
       default and Makefile use `FriendWeighted` (the better scorer). Now consistent.
 
-- [ ] The affinity window for `FriendWeightedScorer` is hardcoded to 7 days
-      (`api.py:82`). Could be a CLI option.
+- [x] The affinity window for `FriendWeightedScorer` is hardcoded to 7 days
+      (`api.py:82`). Now configurable via `--affinity-days`.
 
 ## To think through
 

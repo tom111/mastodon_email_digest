@@ -90,6 +90,7 @@ def run(
     languages: list[str] | None = None,
     language_penalty: float = 0.5,
     min_score: float = 0,
+    affinity_days: int = 7,
 ) -> None:
 
     logging.info("Building digest from the past %d hours...", hours)
@@ -107,7 +108,7 @@ def run(
     if needs_social_context or exclude_lists:
         logging.info("Fetching social context (favourites + lists)...")
         if needs_social_context:
-            affinity_accounts = fetch_affinity_accounts(mst)
+            affinity_accounts = fetch_affinity_accounts(mst, days=affinity_days)
         list_accounts = fetch_list_accounts(mst)
         logging.info(
             "Social context: %d affinity accounts, %d list accounts",
@@ -255,6 +256,13 @@ if __name__ == "__main__":
         type=float,
     )
     arg_parser.add_argument(
+        "--affinity-days",
+        default=7,
+        dest="affinity_days",
+        help="How many days of favourites to consider for the affinity bonus (FriendWeighted scorer)",
+        type=int,
+    )
+    arg_parser.add_argument(
         "--no-email",
         action="store_true",
         default=False,
@@ -309,4 +317,5 @@ if __name__ == "__main__":
         languages=args.languages.split(",") if args.languages else None,
         language_penalty=args.language_penalty,
         min_score=args.min_score,
+        affinity_days=args.affinity_days,
     )
