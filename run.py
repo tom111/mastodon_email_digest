@@ -86,6 +86,7 @@ def run(
     mastodon_username: str,
     output_dir: Path,
     no_email: bool = False,
+    min_score: float = 0,
     sleep_hours: int = 8,
 ) -> None:
 
@@ -122,20 +123,21 @@ def run(
     recent_posts = [p for p in posts if p.info["created_at"] > sleep_cutoff]
     overnight_posts_all = [p for p in posts if p.info["created_at"] <= sleep_cutoff]
 
-    # Score and filter
-    threshold_posts = format_posts(
-        threshold.posts_meeting_criteria(recent_posts, scorer),
-        mastodon_base_url,
-    )
-    threshold_boosts = format_posts(
-        threshold.posts_meeting_criteria(boosts, scorer),
-        mastodon_base_url,
-    )
+    # Score and filter by percentile
+    filtered_posts = threshold.posts_meeting_criteria(recent_posts, scorer)
+    filtered_boosts = threshold.posts_meeting_criteria(boosts, scorer)
     # Overnight section uses a relaxed threshold regardless of CLI choice
-    overnight_threshold_posts = format_posts(
-        Threshold.LAX.posts_meeting_criteria(overnight_posts_all, scorer),
-        mastodon_base_url,
-    )
+    filtered_overnight = Threshold.LAX.posts_meeting_criteria(overnight_posts_all, scorer)
+
+    # Apply minimum score floor
+    if min_score > 0:
+        filtered_posts = [p for p in filtered_posts if p.get_score(scorer) >= min_score]
+        filtered_boosts = [p for p in filtered_boosts if p.get_score(scorer) >= min_score]
+        filtered_overnight = [p for p in filtered_overnight if p.get_score(scorer) >= min_score]
+
+    threshold_posts = format_posts(filtered_posts, mastodon_base_url)
+    threshold_boosts = format_posts(filtered_boosts, mastodon_base_url)
+    overnight_threshold_posts = format_posts(filtered_overnight, mastodon_base_url)
 
     logging.info(
         "After filtering: %d posts, %d boosts, %d overnight posts",
@@ -221,6 +223,13 @@ if __name__ == "__main__":
         help="Output directory for the rendered digest",
     )
     arg_parser.add_argument(
+        "--min-score",
+        default=0,
+        dest="min_score",
+        help="Minimum absolute score for a post to appear in the digest (0 = disabled)",
+        type=float,
+    )
+    arg_parser.add_argument(
         "--no-email",
         action="store_true",
         default=False,
@@ -278,5 +287,6 @@ if __name__ == "__main__":
         mastodon_username=mastodon_username,
         output_dir=output_dir,
         no_email=args.no_email,
+        min_score=args.min_score,
         sleep_hours=args.sleep_hours,
     )
