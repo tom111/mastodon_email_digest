@@ -210,6 +210,17 @@
           </div>
         </div>
 
+        {% if serendipity %}
+        <div class="stream">
+          <div class="stream_title"><span>Serendipity</span></div>
+          <div class="posts">
+            {% with posts=serendipity %}
+            {% include "posts.html.jinja" %}
+            {% endwith %}
+          </div>
+        </div>
+        {% endif %}
+
         <div class="stream">
           <div class="stream_title"><span>Boosts</span></div>
           <div class="posts">

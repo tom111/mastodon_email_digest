@@ -95,6 +95,16 @@ def fetch_affinity_accounts(mastodon_client: Mastodon, days: int = 7) -> set[str
         return set()
 
 
+def fetch_trending_posts(mastodon_client: Mastodon, limit: int = 20) -> list[ScoredPost]:
+    """Fetches currently trending posts from the instance."""
+    try:
+        trending = mastodon_client.trending_statuses(limit=limit)
+        return [ScoredPost(post) for post in trending]
+    except Exception as exc:
+        logging.warning("Could not fetch trending posts: %s", exc)
+        return []
+
+
 def fetch_list_accounts(mastodon_client: Mastodon) -> set[str]:
     """Returns account IDs of all members of the user's lists."""
     try:

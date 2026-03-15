@@ -4,8 +4,10 @@ import argparse
 import inspect
 import logging
 import os
+import random
 import smtplib
 import sys
+from collections import defaultdict
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -16,7 +18,7 @@ from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 from mastodon import Mastodon
 
-from api import fetch_affinity_accounts, fetch_list_accounts, fetch_posts_and_boosts
+from api import fetch_affinity_accounts, fetch_list_accounts, fetch_posts_and_boosts, fetch_trending_posts
 from formatters import format_posts
 from scorers import get_scorers
 from thresholds import get_threshold_from_name, get_thresholds
@@ -77,6 +79,70 @@ def _make_scorer(scorer_class, affinity_accounts: set[str], list_accounts: set[s
     return scorer_class()
 
 
+def _cap_per_account(posts: list, scorer, max_per_account: int) -> list:
+    """Keep only the top `max_per_account` posts per account, ranked by score."""
+    by_account: dict[str, list] = defaultdict(list)
+    for p in posts:
+        acct_id = str(p.info["account"]["id"])
+        by_account[acct_id].append(p)
+    result = []
+    for acct_id, acct_posts in by_account.items():
+        acct_posts.sort(key=lambda p: p.get_score(scorer), reverse=True)
+        result.extend(acct_posts[:max_per_account])
+    return result
+
+
+def _pick_serendipity(
+    boosts: list,
+    posts: list,
+    affinity_accounts: set[str],
+    mastodon_client,
+    count: int = 3,
+) -> list:
+    """Pick serendipity posts: boosts from unfamiliar accounts, with trending fallback."""
+    # Accounts that posted directly to the timeline are followed
+    followed_ids = {str(p.info["account"]["id"]) for p in posts}
+    familiar_ids = followed_ids | affinity_accounts
+
+    # Candidates: boosts from accounts the user doesn't follow or interact with
+    candidates = [
+        b for b in boosts
+        if str(b.info["account"]["id"]) not in familiar_ids
+    ]
+
+    # Deduplicate by account — at most one per account for variety
+    seen_accounts: set[str] = set()
+    unique_candidates = []
+    for c in candidates:
+        acct_id = str(c.info["account"]["id"])
+        if acct_id not in seen_accounts:
+            seen_accounts.add(acct_id)
+            unique_candidates.append(c)
+
+    if len(unique_candidates) >= count:
+        return random.sample(unique_candidates, count)
+
+    # Fallback: trending posts, excluding followed/familiar accounts
+    picks = list(unique_candidates)
+    remaining = count - len(picks)
+    picked_ids = {str(p.info["account"]["id"]) for p in picks}
+
+    trending = fetch_trending_posts(mastodon_client, limit=20)
+    trending_candidates = [
+        t for t in trending
+        if str(t.info["account"]["id"]) not in familiar_ids | picked_ids
+    ]
+    # Deduplicate by account
+    for t in trending_candidates:
+        acct_id = str(t.info["account"]["id"])
+        if acct_id not in picked_ids and remaining > 0:
+            picks.append(t)
+            picked_ids.add(acct_id)
+            remaining -= 1
+
+    return picks
+
+
 def run(
     hours: int,
     scorer_class,
@@ -91,6 +157,8 @@ def run(
     language_penalty: float = 0.5,
     min_score: float = 0,
     affinity_days: int = 7,
+    max_per_account: int = 3,
+    max_posts: int = 20,
 ) -> None:
 
     logging.info("Building digest from the past %d hours...", hours)
@@ -145,12 +213,32 @@ def run(
         filtered_posts = [p for p in filtered_posts if p.get_score(scorer) >= min_score]
         filtered_boosts = [p for p in filtered_boosts if p.get_score(scorer) >= min_score]
 
+    # Cap posts per account to avoid a single voice dominating the digest
+    if max_per_account > 0:
+        filtered_posts = _cap_per_account(filtered_posts, scorer, max_per_account)
+        filtered_boosts = _cap_per_account(filtered_boosts, scorer, max_per_account)
+
+    # Hard cap: keep only the top N by score if we exceed max_posts
+    if max_posts > 0:
+        if len(filtered_posts) > max_posts:
+            filtered_posts.sort(key=lambda p: p.get_score(scorer), reverse=True)
+            filtered_posts = filtered_posts[:max_posts]
+        if len(filtered_boosts) > max_posts:
+            filtered_boosts.sort(key=lambda p: p.get_score(scorer), reverse=True)
+            filtered_boosts = filtered_boosts[:max_posts]
+
+    # Pick serendipity posts from the full (unfiltered) boosts pool
+    serendipity = _pick_serendipity(boosts, posts, affinity_accounts, mst)
+    logging.info("Serendipity: %d posts selected", len(serendipity))
+
     threshold_posts = format_posts(filtered_posts, mastodon_base_url)
+    serendipity_posts = format_posts(serendipity, mastodon_base_url)
     threshold_boosts = format_posts(filtered_boosts, mastodon_base_url)
 
     logging.info(
-        "After filtering: %d posts, %d boosts",
+        "After filtering: %d posts, %d serendipity, %d boosts",
         len(threshold_posts),
+        len(serendipity_posts),
         len(threshold_boosts),
     )
 
@@ -159,6 +247,7 @@ def run(
         context={
             "hours": hours,
             "posts": threshold_posts,
+            "serendipity": serendipity_posts,
             "boosts": threshold_boosts,
             "mastodon_base_url": mastodon_base_url,
             "rendered_at": datetime.now(timezone.utc).isoformat(),
@@ -263,6 +352,20 @@ if __name__ == "__main__":
         type=int,
     )
     arg_parser.add_argument(
+        "--max-posts",
+        default=20,
+        dest="max_posts",
+        help="Maximum posts (and boosts) in the digest; on busy days only the top N by score are kept (0 = unlimited)",
+        type=int,
+    )
+    arg_parser.add_argument(
+        "--max-per-account",
+        default=3,
+        dest="max_per_account",
+        help="Maximum posts per account in the digest (0 = unlimited)",
+        type=int,
+    )
+    arg_parser.add_argument(
         "--no-email",
         action="store_true",
         default=False,
@@ -318,4 +421,6 @@ if __name__ == "__main__":
         language_penalty=args.language_penalty,
         min_score=args.min_score,
         affinity_days=args.affinity_days,
+        max_per_account=args.max_per_account,
+        max_posts=args.max_posts,
     )

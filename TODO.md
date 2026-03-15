@@ -30,6 +30,17 @@
 - [x] The affinity window for `FriendWeightedScorer` is hardcoded to 7 days
       (`api.py:82`). Now configurable via `--affinity-days`.
 
+- [x] Per-account cap — no single account appears more than N times (default 3).
+      Configurable via `--max-per-account`.
+
+- [x] Digest size cap (`--max-posts`, default 20) — on busy days, keeps only the
+      top N posts/boosts by score. Quiet days naturally produce fewer posts via the
+      percentile threshold.
+
+- [x] Serendipity section — 3 posts from unfamiliar accounts (not followed, not in
+      affinity set), picked randomly from the boosts pool. Falls back to instance
+      trending posts if not enough candidates. Shown between Posts and Boosts.
+
 - [ ] Update the README file.  This is now a new fork with new perspective.
 
 ## To think through
