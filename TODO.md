@@ -41,7 +41,7 @@
       affinity set), picked randomly from the boosts pool. Falls back to instance
       trending posts if not enough candidates. Shown between Posts and Boosts.
 
-- [ ] Update the README file.  This is now a new fork with new perspective.
+- [x] Update the README file.  This is now a new fork with new perspective.
 
 ## To think through
 

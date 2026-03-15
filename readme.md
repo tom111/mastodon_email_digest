@@ -1,38 +1,71 @@
-> An email flavor of [mastodon digest](https://github.com/mauforonda/mastodon_digest), originally forked from [hodgesmr/mastodon_digest](https://github.com/hodgesmr/mastodon_digest)
+# Mastodon Email Digest
 
-**Mastodon Email Digest** scans posts you haven't yet seen in your timeline and sends the most popular ones to your inbox 🦣 → ✉️
+A daily email digest of the best posts from your Mastodon home timeline.
 
-![](howitlooks.png "How it would look in your inbox")
+## Why
 
-## To run your own
+Social media algorithms are designed to maximize engagement, not to inform you.
+Reverse-chronological feeds are better, but on a busy timeline you still miss
+good posts while drowning in noise. This project takes a middle path: it scores
+posts by engagement signals, filters to the top percentile, and emails you a
+short digest once a day. You stay informed without doomscrolling.
 
-1. Fork this repository
-2. Create repository secrets (`Settings` → `Secrets/Actions` → `New repository secrets`) for:
-  - `MASTODON_BASE_URL`: the url of your instance, like `https://mastodon.social`
-  - `MASTODON_USERNAME`: your user name, like `Gargron`
-  - `MASTODON_TOKEN`: a token you request in your instance settings under `Preferences` → `Development`
-  - `MAIL_SERVER`: the server you want to send emails from, `smtp.gmail.com` if you use gmail.
-  - `MAIL_SERVER_PORT`:  the server port you want to send emails from, `465` if you use gmail.
-  - `MAIL_USERNAME`: your username in the server.
-  - `MAIL_PASSWORD`: your email password. If you're using gmail, use an [app password](https://support.google.com/accounts/answer/185833?hl=en) for `Mail` and any device, after setting up 2-step verification.
-  - `MAIL_DESTINATION`: the address you want to get the digest on, like `gargrons_inbox@gmail.com`
-3. Adjust the [github workflow](.github/workflows/update.yml) however you want
-  - edit `cron` to define how often you want the digest to run
-  - edit the command `python run.py -n 24 -s SimpleWeighted -t lax` with your own preferences for:
+## How it works
+
+1. **Fetch** your home timeline (up to 1000 posts in the lookback window)
+2. **Score** each post using a geometric mean of boosts, favourites, and replies
+3. **Filter** to the top percentile (configurable: 90th / 95th / 98th)
+4. **Cap** the digest to avoid overload (per-account limit + total limit)
+5. **Serendipity** section: 3 posts from accounts you don't follow, surfaced
+   through your network's boosts (falls back to instance trending posts)
+6. **Render** as HTML and email it to you
+
+## Quick start
+
+```bash
+cp .env.example .env   # fill in your Mastodon + SMTP credentials
+pip install -r requirements.txt
+mkdir -p render
+python run.py -n 24 -s FriendWeighted -t lax --no-email
+open render/index.html
 ```
-  -n {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24}
-                        The number of hours to consider (default: 12)
-  -s {ExtendedSimple,ExtendedSimpleWeighted,Simple,SimpleWeighted}
-                        Which post scoring criteria to use. Simple scorers take a geometric
-                        mean of boosts and favs. Extended scorers include reply counts in
-                        the geometric mean. Weighted scorers multiply the score by an
-                        inverse sqaure root of the author's followers, to reduce the
-                        influence of large accounts. (default: SimpleWeighted)
-  -t {lax,normal,strict}
-                        Which post threshold criteria to use. lax = 90th percentile, normal
-                        = 95th percentile, strict = 98th percentile (default: normal)
-```
-4. Enable github actions under `Settings` → `Actions/General`. 
 
+See [deploy.md](deploy.md) for full deployment instructions (cron, systemd, Docker).
 
-If you've set your secrets right you'll receive an email at the time you specified. And if you want to test it right away you can always go to the `Actions` tab, select the `My Mastodon Email Digest` workflow and `Run workflow`, which should send you and email in about a minute ✉️
+## CLI options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n` | `12` | Hours to look back (1-24) |
+| `-s` | `FriendWeighted` | Scorer algorithm |
+| `-t` | `normal` | Threshold: `lax` (90th), `normal` (95th), `strict` (98th) |
+| `-o` | `./render/` | Output directory |
+| `--languages` | all | Comma-separated ISO 639-1 codes (e.g. `en,de`) |
+| `--language-penalty` | `0.5` | Score multiplier for non-preferred languages |
+| `--exclude-lists` | off | Drop posts from accounts on your Mastodon lists |
+| `--min-score` | `0` | Minimum absolute score (0 = disabled) |
+| `--affinity-days` | `7` | Days of favourites for affinity scoring |
+| `--max-posts` | `20` | Max posts per section (0 = unlimited) |
+| `--max-per-account` | `3` | Max posts per account (0 = unlimited) |
+| `--no-email` | off | Write HTML only, don't send email |
+| `--log-file` | none | Log to file in addition to stdout |
+
+## Scorers
+
+- **Simple** / **SimpleWeighted** -- geometric mean of boosts and favourites
+- **ExtendedSimple** / **ExtendedSimpleWeighted** -- adds reply count
+- **FriendBoost** -- weighs network boost count (how many of your follows boosted it)
+- **FriendWeighted** -- adds affinity bonus (accounts you recently favourited) and list membership bonus
+
+`Weighted` variants divide by sqrt(follower count) to prevent large accounts from dominating.
+
+## History
+
+Originally forked from [hodgesmr/mastodon_digest](https://github.com/hodgesmr/mastodon_digest)
+via [mauforonda/mastodon_digest](https://github.com/mauforonda/mastodon_digest).
+This fork has diverged significantly with new scoring algorithms, email delivery,
+language filtering, serendipity posts, and digest size controls.
+
+## License
+
+BSD 3-Clause. See [LICENSE](LICENSE).

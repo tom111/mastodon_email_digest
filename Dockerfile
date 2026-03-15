@@ -23,7 +23,7 @@ COPY *.py .
 
 LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.name=$NAME \
-      org.label-schema.description="A Python script that aggregates recent popular tweets from your Mastodon timeline " \
+      org.label-schema.description="Scores and emails popular posts from your Mastodon home timeline" \
       org.label-schema.url="https://github.com/${ORG}/${NAME}" \
       org.label-schema.vcs-url="https://github.com/${ORG}/${NAME}" \
       org.label-schema.vcs-ref=$VCS_REF \
@@ -32,4 +32,4 @@ LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.docker.schema-version="1.0" \
       org.label-schema.docker.cmd="docker run ${ORG}/${NAME}"
 
-ENTRYPOINT ["venvs/mastodon_digest/bin/python3", "run.py"]
+ENTRYPOINT ["venvs/mastodon_email_digest/bin/python3", "run.py"]

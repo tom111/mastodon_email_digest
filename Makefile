@@ -4,8 +4,8 @@ VERSION := $(shell git describe --abbrev=0 --tags 2>/dev/null || echo dev)
 BUILD_DATE := "$(shell date -u)"
 VCS_REF := $(shell git log -1 --pretty=%h)
 NAME := $(shell pwd | xargs basename)
-VENDOR := "Matt Hodges"
-ORG := hodgesmr
+VENDOR := "Thomas Kahle"
+ORG := tom111
 WORKDIR := "/opt/${NAME}"
 
 DOCKER_SCAN_SUGGEST=false
