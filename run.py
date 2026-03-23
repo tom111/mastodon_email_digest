@@ -231,6 +231,10 @@ def run(
     serendipity = _pick_serendipity(boosts, posts, affinity_accounts, mst)
     logging.info("Serendipity: %d posts selected", len(serendipity))
 
+    # Remove serendipity picks from filtered boosts to avoid duplicates
+    serendipity_ids = {p.info["id"] for p in serendipity}
+    filtered_boosts = [p for p in filtered_boosts if p.info["id"] not in serendipity_ids]
+
     threshold_posts = format_posts(filtered_posts, mastodon_base_url)
     serendipity_posts = format_posts(serendipity, mastodon_base_url)
     threshold_boosts = format_posts(filtered_boosts, mastodon_base_url)
